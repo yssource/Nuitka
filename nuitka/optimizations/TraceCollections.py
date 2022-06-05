@@ -33,7 +33,7 @@ from nuitka.containers.oset import OrderedSet
 from nuitka.ModuleRegistry import addUsedModule
 from nuitka.nodes.NodeMakingHelpers import getComputationResult
 from nuitka.nodes.shapes.BuiltinTypeShapes import tshape_dict
-from nuitka.nodes.shapes.StandardShapes import tshape_uninit
+from nuitka.nodes.shapes.StandardShapes import tshape_uninitialized
 from nuitka.tree.SourceReading import readSourceLine
 from nuitka.utils.InstanceCounters import (
     counted_del,
@@ -358,7 +358,7 @@ class TraceCollectionBase(object):
     They are kept for "variable" and versions.
     """
 
-    __slots__ = ("owner", "parent", "name", "value_states", "variable_actives")
+    __slots__ = ("owner", "parent", "name", "variable_actives")
 
     if isCountingInstances():
         __del__ = counted_del()
@@ -368,9 +368,6 @@ class TraceCollectionBase(object):
         self.owner = owner
         self.parent = parent
         self.name = name
-
-        # Value state extra information per node.
-        self.value_states = {}
 
         # Currently active values in the tracing.
         self.variable_actives = {}
@@ -413,7 +410,7 @@ class TraceCollectionBase(object):
     def markActiveVariableAsEscaped(self, variable):
         current = self.getVariableCurrentTrace(variable)
 
-        if not current.isEscapeOrUnknownOrUninitTrace():
+        if not current.isEscapeOrUnknownOrUninitializedTrace():
             version = variable.allocateTargetNumber()
 
             self.addVariableTrace(
@@ -449,7 +446,7 @@ class TraceCollectionBase(object):
             # assert shapes, (variable, current)
 
             if not shapes:
-                shapes.add(tshape_uninit)
+                shapes.add(tshape_uninitialized)
 
             result = ValueTraceLoopComplete(loop_node, current, shapes)
 
@@ -907,21 +904,6 @@ class TraceCollectionBase(object):
 
         return new_node, change_tags, message
 
-    def getIteratorNextCount(self, iter_node):
-        return self.value_states.get(iter_node)
-
-    def initIteratorValue(self, iter_node):
-        # TODO: More complex state information will be needed eventually.
-        self.value_states[iter_node] = 0
-
-    def onIteratorNext(self, iter_node):
-        if iter_node in self.value_states:
-            self.value_states[iter_node] += 1
-
-    def resetValueStates(self):
-        for key in self.value_states:
-            self.value_states[key] = None
-
     def addOutlineFunction(self, outline):
         self.parent.addOutlineFunction(outline)
 
@@ -1125,7 +1107,7 @@ def areEmptyTraces(variable_traces):
             # from being removed.
 
             return False
-        elif variable_trace.isUninitTrace():
+        elif variable_trace.isUninitializedTrace():
             if variable_trace.getUsageCount():
                 # Checking definite is enough, the merges, we shall see
                 # them as well.
@@ -1167,7 +1149,7 @@ def areReadOnlyTraces(variable_traces):
             # from being not released.
 
             return False
-        elif variable_trace.isUninitTrace():
+        elif variable_trace.isUninitializedTrace():
             pass
         elif variable_trace.isUnknownTrace():
             return False

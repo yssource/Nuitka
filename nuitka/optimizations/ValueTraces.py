@@ -23,10 +23,10 @@ the SSA (Single State Assignment) form being used in Nuitka.
 Values can be seen as:
 
 * Unknown (maybe initialized, maybe not, we cannot know)
-* Uninit (definitely not initialized, first version)
+* Uninitialized (definitely not initialized, first version)
 * Init (definitely initialized, e.g. parameter variables)
 * Assign (assignment was done)
-* Deleted (del was done, now unassigned, uninitialted)
+* Deleted (del was done, now unassigned, uninitialized)
 * Merge (result of diverged code paths, loop potentially)
 * LoopIncomplete (aggregation during loops, not yet fully known)
 * LoopComplete (complete knowledge of loop types)
@@ -36,7 +36,7 @@ from nuitka.nodes.shapes.BuiltinTypeShapes import tshape_dict, tshape_tuple
 from nuitka.nodes.shapes.StandardShapes import (
     ShapeLoopCompleteAlternative,
     ShapeLoopInitialAlternative,
-    tshape_uninit,
+    tshape_uninitialized,
     tshape_unknown,
 )
 from nuitka.utils.InstanceCounters import (
@@ -132,7 +132,7 @@ class ValueTraceBase(object):
         return False
 
     @staticmethod
-    def isUninitTrace():
+    def isUninitializedTrace():
         return False
 
     @staticmethod
@@ -148,7 +148,7 @@ class ValueTraceBase(object):
         return False
 
     @staticmethod
-    def isEscapeOrUnknownOrUninitTrace():
+    def isEscapeOrUnknownOrUninitializedTrace():
         return False
 
     @staticmethod
@@ -200,14 +200,28 @@ class ValueTraceBase(object):
 
     @staticmethod
     def getAttributeNode():
+        """Node to use for attribute lookups."""
         return None
 
     @staticmethod
     def getAttributeNodeTrusted():
+        """Node to use for attribute lookups, with increased trust.
+
+        Used with hard imports mainly.
+        """
         return None
 
     @staticmethod
     def getAttributeNodeVeryTrusted():
+        """Node to use for attribute lookups, with highest trust.
+
+        Used for hard imports mainly.
+        """
+        return None
+
+    @staticmethod
+    def getIterationSourceNode():
+        """Node to use for iteration decisions."""
         return None
 
 
@@ -220,7 +234,7 @@ class ValueTraceUnassignedBase(ValueTraceBase):
 
     @staticmethod
     def getTypeShape():
-        return tshape_uninit
+        return tshape_uninitialized
 
     def compareValueTrace(self, other):
         # We are unassigned, just need to know if the other one is, pylint: disable=no-self-use
@@ -242,11 +256,11 @@ class ValueTraceUninitialized(ValueTraceUnassignedBase):
         ValueTraceUnassignedBase.__init__(self, owner=owner, previous=previous)
 
     @staticmethod
-    def isUninitTrace():
+    def isUninitializedTrace():
         return True
 
     @staticmethod
-    def isEscapeOrUnknownOrUninitTrace():
+    def isEscapeOrUnknownOrUninitializedTrace():
         return True
 
 
@@ -344,7 +358,7 @@ class ValueTraceUnknown(ValueTraceBase):
         return True
 
     @staticmethod
-    def isEscapeOrUnknownOrUninitTrace():
+    def isEscapeOrUnknownOrUninitializedTrace():
         return True
 
     @staticmethod
@@ -407,7 +421,7 @@ class ValueTraceEscaped(ValueTraceUnknown):
         return True
 
     @staticmethod
-    def isEscapeOrUnknownOrUninitTrace():
+    def isEscapeOrUnknownOrUninitializedTrace():
         return True
 
     def getAttributeNode(self):
@@ -498,6 +512,9 @@ class ValueTraceAssign(ValueTraceBase):
             return source_node
         else:
             return None
+
+    def getIterationSourceNode(self):
+        return self.assign_node.subnode_source
 
 
 class ValueTraceMergeBase(ValueTraceBase):
